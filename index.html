@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1f3a">
+<title>CFBox 节点维护面板</title>
+<style>
+  :root {
+    --bg-top: #0b1f3a;
+    --bg-bottom: #123a6b;
+    --accent: #2f80ed;
+    --accent-2: #00c9a7;
+    --ok: #0f9d58;
+    --warn: #f9ab00;
+    --err: #d93025;
+    --text: #16233a;
+    --muted: #5f7289;
+    --card: #ffffff;
+    --card-glow: rgba(47, 128, 237, .18);
+    --border: #e3ecf7;
+    --mono: "Cascadia Code", Consolas, "SF Mono", monospace;
+    --radius: 16px;
+    --shadow: 0 8px 28px rgba(11, 31, 58, .10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
+    color: var(--text);
+    background: linear-gradient(160deg, var(--bg-top) 0%, var(--bg-bottom) 55%, #0f7f9e 130%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    padding: 24px 16px 56px;
+  }
+  /* 顶部装饰光斑 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(600px 300px at 15% -5%, rgba(47,128,237,.35), transparent 65%),
+      radial-gradient(500px 300px at 90% 10%, rgba(0,201,167,.22), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; position: relative; z-index: 1; }
+
+  /* ===== Header ===== */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 4px 20px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 44px; height: 44px;
+    border-radius: 13px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center;
+    color: #fff; font-size: 24px;
+    box-shadow: 0 6px 18px rgba(47,128,237,.4);
+  }
+  .brand h1 { color: #fff; font-size: 21px; font-weight: 700; letter-spacing: .5px; }
+  .brand .sub { color: rgba(255,255,255,.65); font-size: 12px; margin-top: 3px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.18);
+    color: #fff;
+    font-size: 12.5px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+    white-space: nowrap;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #93a8c0; }
+  .dot.run { background: var(--warn); animation: pulse 1s infinite; }
+  .dot.done { background: var(--ok); }
+  .dot.err { background: var(--err); }
+  @keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
+
+  /* ===== 卡片 ===== */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    animation: rise .35s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+  .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .step-badge {
+    width: 30px; height: 30px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #5b9dff);
+    color: #fff; font-size: 14px; font-weight: 700;
+    display: grid; place-items: center;
+    box-shadow: 0 4px 12px rgba(47,128,237,.35);
+  }
+  .card-head h2 { font-size: 16px; font-weight: 700; }
+  .card-head .tip { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+  /* ===== Step1 控制 ===== */
+  .controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .field { display: flex; align-items: center; gap: 8px; }
+  .field label { font-size: 13px; color: var(--muted); }
+  .input {
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    width: 112px;
+    font-family: var(--mono);
+    background: #f7fafd;
+    transition: border-color .15s;
+  }
+  .input:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .btn {
+    border: none; border-radius: 11px;
+    padding: 12px 26px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s, opacity .15s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #1c5fd6);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(47,128,237,.38);
+  }
+  .btn-primary:hover:not(:disabled) { box-shadow: 0 8px 24px rgba(47,128,237,.5); }
+  .btn-ok {
+    background: linear-gradient(135deg, #12b76a, #0f9d58);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(15,157,88,.35);
+  }
+  .btn-ghost {
+    background: #fff; color: var(--accent);
+    border: 1.5px solid var(--accent);
+  }
+  .hint { font-size: 12.5px; color: var(--muted); line-height: 1.75; margin-top: 12px; }
+  .hint b { color: var(--text); }
+
+  /* ===== Step2 日志 ===== */
+  #log {
+    background: #0d1b2e;
+    color: #c8dcf0;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    border-radius: 12px;
+    padding: 14px 16px;
+    height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    scrollbar-width: thin;
+  }
+  #log::-webkit-scrollbar { width: 8px; }
+  #log::-webkit-scrollbar-thumb { background: #27425f; border-radius: 8px; }
+  .log-info { color: #c8dcf0; }
+  .log-ok { color: #4ade80; }
+  .log-warn { color: #fbbf24; }
+  .log-err { color: #f87171; }
+
+  /* ===== Step3 结果 ===== */
+  .result-meta {
+    font-size: 12.5px; color: var(--muted);
+    background: #f4f8fd;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 14px;
+    margin-bottom: 12px;
+  }
+  .tbl-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 480px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid #edf3fa; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; background: #f7fafd; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: #f6faff; }
+  td.mono { font-family: var(--mono); font-size: 13px; }
+  .tag { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; font-weight: 700; }
+  .tag-new { background: #e4f6ec; color: var(--ok); }
+  .tag-base { background: #e8f0fe; color: var(--accent); }
+  .speed { font-family: var(--mono); font-weight: 800; color: var(--ok); }
+
+  .deploy-box {
+    background: linear-gradient(135deg, #fff8e6, #fffdf5);
+    border: 1px solid #f3dca0;
+    color: #8a6d1a;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.75;
+    margin: 16px 0;
+  }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .msg { margin-top: 12px; font-size: 13.5px; font-weight: 700; }
+  .msg.ok { color: var(--ok); }
+  .msg.err { color: var(--err); }
+  textarea {
+    width: 100%;
+    height: 128px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 14px;
+    background: #f7fafd;
+    resize: vertical;
+  }
+  .hidden { display: none !important; }
+
+  footer {
+    margin-top: 30px;
+    font-size: 12px;
+    color: rgba(255,255,255,.6);
+    text-align: center;
+    line-height: 2;
+  }
+  footer code { background: rgba(255,255,255,.1); padding: 2px 8px; border-radius: 6px; }
+
+  /* ================= 响应式 ================= */
+  /* 平板 */
+  @media (max-width: 860px) {
+    body { padding: 18px 14px 48px; }
+    .wrap { max-width: 100%; }
+    .card { padding: 18px 16px; }
+  }
+  /* 手机 */
+  @media (max-width: 600px) {
+    body { padding: 12px 10px 40px; }
+    header { padding-bottom: 14px; }
+    .logo { width: 38px; height: 38px; font-size: 20px; border-radius: 11px; }
+    .brand h1 { font-size: 17px; }
+    .pill { font-size: 11.5px; padding: 6px 11px; }
+    .card { border-radius: 14px; padding: 16px 14px; margin-bottom: 12px; }
+    .card-head h2 { font-size: 15px; }
+    .controls { flex-direction: column; align-items: stretch; gap: 10px; }
+    .field { justify-content: space-between; }
+    .field label { font-size: 13.5px; }
+    .input { flex: 1; width: auto; }
+    .btn { width: 100%; padding: 14px; font-size: 15.5px; }
+    .actions { flex-direction: column; }
+    .actions .btn { margin: 0; }
+    #log { height: 240px; font-size: 12px; padding: 11px 12px; }
+    .hint { font-size: 12px; }
+    /* 表格在手机上转卡片列表 */
+    .tbl-wrap { border: none; overflow: visible; }
+    table { min-width: 0; border: none; }
+    thead { display: none; }
+    tbody { display: block; }
+    tbody tr {
+      display: block;
+      background: #f7fafd;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    tbody tr:hover td { background: transparent; }
+    tbody td {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: none;
+      padding: 6px 0;
+      white-space: normal;
+      gap: 10px;
+    }
+    tbody td::before {
+      content: attr(data-label);
+      color: var(--muted);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    tbody td.mono { font-size: 12.5px; text-align: right; word-break: break-all; }
+    tbody td.speed { font-size: 14px; }
+    .speed { text-align: right; }
+    .result-meta { font-size: 11.5px; padding: 8px 11px; }
+    .deploy-box { font-size: 12.5px; padding: 11px 13px; }
+    textarea { height: 110px; }
+  }
+  /* 极小屏 */
+  @media (max-width: 380px) {
+    .brand h1 { font-size: 15px; }
+    .card-head .tip { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">⚡</div>
+      <div>
+        <h1>CFBox 节点维护面板</h1>
+        <div class="sub">优选 · 测速 · 保底 · 自动部署</div>
+      </div>
+    </div>
+    <span class="pill" id="statusPill"><span class="dot" id="statusDot"></span><span id="statusText">空闲</span></span>
+  </header>
+
+  <!-- Step 1 -->
+  <section class="card" style="animation-delay:.03s">
+    <div class="card-head">
+      <span class="step-badge">1</span>
+      <h2>开始优选</h2>
+      <span class="tip">全程约 2~4 分钟</span>
+    </div>
+    <div class="controls">
+      <div class="field">
+        <label for="minKbps">速度门槛（kbps）</label>
+        <input class="input" id="minKbps" type="number" value="10000" step="1000" min="1000">
+      </div>
+      <button class="btn btn-primary" id="btnStart">▶ 开始优选</button>
+    </div>
+    <div class="hint">
+      自动完成：拉取优选源 → TCP 连通筛选 → <b>xray 真实隧道测速</b> → 保底保护（正在用的好节点只要活着就保留）。
+      结果仅展示、不会自动改动配置，确认后再进入第 3 步部署。
+    </div>
+  </section>
+
+  <!-- Step 2 -->
+  <section class="card" style="animation-delay:.06s">
+    <div class="card-head">
+      <span class="step-badge">2</span>
+      <h2>实时进度</h2>
+      <span class="tip" id="progressTip">等待启动...</span>
+    </div>
+    <div id="log"><span class="log-info">面板已就绪。点击「开始优选」后，这里会实时显示完整流程。</span></div>
+  </section>
+
+  <!-- Step 3 -->
+  <section class="card hidden" id="resultCard" style="animation-delay:.09s">
+    <div class="card-head">
+      <span class="step-badge">3</span>
+      <h2>优选结果 &amp; 部署</h2>
+    </div>
+    <div class="result-meta" id="resultInfo"></div>
+    <div class="tbl-wrap">
+      <table id="resultTable">
+        <thead>
+          <tr><th>#</th><th>来源</th><th>节点（IP:端口）</th><th>延迟</th><th>单连接速度</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="deploy-box">
+      ① 点「更新部署」自动写入 <b>qinyu</b>（CFBox订阅）　② 点「自动上传」并在对话发送 <b>上传cfbb</b>，我自动填表保存到 cfbb 管理页
+      　③ 到 Karing 更新「自己用」「CFBox订阅」生效。
+    </div>
+    <div class="actions">
+      <button class="btn btn-ok" id="btnApply">✓ 更新部署</button>
+      <button class="btn btn-primary" id="btnUpload">⚡ 自动上传到 cfbb</button>
+      <button class="btn btn-ghost" id="btnCopy">📋 复制内容（兜底）</button>
+    </div>
+    <div class="msg hidden" id="applyMsg"></div>
+    <div class="msg hidden" id="uploadMsg"></div>
+    <textarea id="cfbbBox" readonly placeholder="复制内容：这里显示要粘贴到 cfbb 管理页「自定义优选」的节点..."></textarea>
+  </section>
+
+  <footer>
+    本地工具 · 数据只在你的电脑上处理<br>
+    关闭服务：关掉启动时的黑色窗口
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const btnStart = $('btnStart'), btnApply = $('btnApply'), btnCopy = $('btnCopy'), btnUpload = $('btnUpload');
+const LABELS = { ip: '节点', src: '来源', ms: '延迟', speed: '速度' };
+let lastLogCount = -1;
+
+function setStatus(running, text, cls) {
+  const dot = $('statusDot');
+  dot.className = 'dot ' + (cls || (running ? 'run' : ''));
+  $('statusText').textContent = text;
+}
+
+function stageOf(logs) {
+  const all = (logs || []).join('\n');
+  if (all.includes('隧道测速')) return 'xray 隧道测速中...';
+  if (all.includes('TCP 筛选')) return '连通性筛选中...';
+  if (all.includes('拉取优选源')) return '拉取候选节点中...';
+  if (all.includes('保底节点')) return '检查保底节点中...';
+  return '';
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+function renderLog(lines) {
+  const el = $('log');
+  const autoScroll = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  el.innerHTML = lines.map(l => {
+    let cls = 'log-info';
+    if (l.includes('✓') || l.includes('完成')) cls = 'log-ok';
+    else if (l.includes('✗') || l.includes('ERROR') || l.includes('失败')) cls = 'log-err';
+    else if (l.includes('保底') || l.includes('===') || l.includes('达标') || l.includes('优选结果')) cls = 'log-warn';
+    return `<div class="${cls}">${esc(l)}</div>`;
+  }).join('');
+  if (autoScroll) el.scrollTop = el.scrollHeight;
+  const s = stageOf(lines);
+  $('progressTip').textContent = s || (lines.length ? '运行中...' : '等待启动...');
+}
+
+function renderResult(r) {
+  const srcCn = r.mode === 'apply' ? '正式（已部署）' : '预演（仅展示）';
+  $('resultInfo').textContent =
+    `本次结果 · ${r.time} · ${srcCn} · 保底存活 ${r.baseline_alive.length}/8 · 门槛 ${r.min_kbps} kbps`;
+  const tb = $('resultTable').querySelector('tbody');
+  tb.innerHTML = r.nodes.map((n, i) => {
+    const isNew = n.source === 'new';
+    return `
+    <tr>
+      <td data-label="#"><span style="opacity:.55">${i + 1}</span></td>
+      <td data-label="来源"><span class="tag ${isNew ? 'tag-new' : 'tag-base'}">${isNew ? '新优选' : '保底'}</span></td>
+      <td data-label="节点" class="mono">${n.ip}:${n.port}</td>
+      <td data-label="延迟" class="mono">${n.ms} ms</td>
+      <td data-label="速度" class="speed">${(n.kbps / 1000).toFixed(1)} Mbps</td>
+    </tr>`;
+  }).join('');
+  fetch('/api/cfbb').then(r2 => r2.json()).then(d => { $('cfbbBox').value = d.content || ''; });
+  $('resultCard').classList.remove('hidden');
+}
+
+async function poll() {
+  try {
+    const d = await (await fetch('/api/status')).json();
+    const logChanged = d.logs.length !== lastLogCount;
+    if (logChanged) {
+      lastLogCount = d.logs.length;
+      renderLog(d.logs);
+    }
+    if (d.running) {
+      setStatus(true, '优选进行中', 'run');
+      btnStart.disabled = true;
+      btnApply.disabled = true;
+    } else {
+      btnStart.disabled = false;
+      btnApply.disabled = false;
+      if (d.result) {
+        setStatus(false, '优选完成', 'done');
+        if (logChanged || !$('resultCard').classList.contains('hidden')) renderResult(d.result);
+      } else if (d.last_error) {
+        setStatus(false, '出错了', 'err');
+        $('progressTip').textContent = '任务异常，请看日志';
+      } else {
+        setStatus(false, '空闲');
+      }
+    }
+  } catch (e) {
+    setStatus(false, '服务未连接', 'err');
+    $('progressTip').textContent = '确认黑色启动窗口还在运行';
+  }
+}
+
+btnStart.onclick = async () => {
+  const min = parseInt($('minKbps').value) || 10000;
+  $('resultCard').classList.add('hidden');
+  $('applyMsg').classList.add('hidden');
+  $('uploadMsg').classList.add('hidden');
+  const d = await (await fetch('/api/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({min_kbps: min})
+  })).json();
+  if (!d.ok) { alert('任务已在运行中，请等待完成'); return; }
+  setStatus(true, '启动中...', 'run');
+  $('progressTip').textContent = '启动中...';
+};
+
+btnApply.onclick = async () => {
+  btnApply.disabled = true;
+  btnApply.textContent = '部署中...';
+  const d = await (await fetch('/api/apply', {method: 'POST'})).json();
+  btnApply.disabled = false;
+  btnApply.textContent = '✓ 更新部署';
+  const msg = $('applyMsg');
+  msg.classList.remove('hidden');
+  if (d.ok && d.qinyu_ok) {
+    msg.className = 'msg ok';
+    msg.textContent = '✓ qinyu 已更新；cfbb 内容已生成，可继续「自动上传」或复制。';
+  } else if (d.ok) {
+    msg.className = 'msg err';
+    msg.textContent = 'qinyu 更新可能未成功（看日志），但 cfbb 内容已生成。';
+  } else {
+    msg.className = 'msg err';
+    msg.textContent = '更新失败：' + (d.error || '未知错误');
+  }
+};
+
+btnUpload.onclick = async () => {
+  const d = await (await fetch('/api/upload-check')).json();
+  const msg = $('uploadMsg');
+  msg.classList.remove('hidden');
+  if (d.ready) {
+    msg.className = 'msg ok';
+    msg.textContent = '✓ 内容已就绪！在对话里发送「上传cfbb」，自动完成填表保存。';
+  } else {
+    msg.className = 'msg err';
+    msg.textContent = '还没有可上传内容，请先点「更新部署」。';
+  }
+};
+
+btnCopy.onclick = async () => {
+  const d = await (await fetch('/api/cfbb')).json();
+  const content = d.content || '';
+  if (!content) { alert('还没有可复制的内容，请先点「更新部署」'); return; }
+  try {
+    await navigator.clipboard.writeText(content);
+    alert('已复制 ' + content.split('\n').filter(Boolean).length + ' 条节点，到 cfbb 管理页粘贴保存即可');
+  } catch (e) {
+    $('cfbbBox').select();
+    document.execCommand('copy');
+    alert('已复制（兼容模式）');
+  }
+};
+
+setInterval(poll, 1000);
+poll();
+</script>
+</body>
+</html>

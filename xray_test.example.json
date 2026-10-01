@@ -1,0 +1,24 @@
+{
+  "log": {"loglevel": "warning"},
+  "inbounds": [{"port": 10809, "listen": "127.0.0.1", "protocol": "socks", "settings": {"udp": true}}],
+  "outbounds": [
+    {
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "SERVER_IP",
+            "port": SERVER_PORT,
+            "users": [{"id": "YOUR-UUID-HERE", "encryption": "none"}]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {"serverName": "YOUR-SNI-HOST", "fingerprint": "chrome"},
+        "wsSettings": {"path": "/?ed=2048", "headers": {"Host": "YOUR-SNI-HOST"}}
+      }
+    }
+  ]
+}
