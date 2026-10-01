@@ -1,79 +1,55 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#0b1f3a">
-    <meta name="description" content="CFBox 节点维护面板 - Cloudflare Workers VLESS 订阅节点的自动优选、真实测速、保底保护与自动部署工具">
-    <title>CFBox 节点维护面板</title>
-  <style>
-      :root {
-            --bg-top: #0b1f3a; --bg-bottom: #123a6b;
-            --accent: #2f80ed; --accent2: #00c9a7;
-            --text: #16233a; --muted: #5f7289; --card: #fff;
-            --border: #e3ecf7; --radius: 16px;
-      }
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body {
-            font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
-            color: var(--text);
-            background: linear-gradient(160deg, var(--bg-top), var(--bg-bottom) 55%, #0f7f9e 135%);
-            background-attachment: fixed;
-            min-height: 100vh;
-            padding-bottom: 50px;
-      }
-      body::before {
-            content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-            background: radial-gradient(600px 300px at 15% -5%, rgba(47,128,237,.35), transparent 65%),
-                              radial-gradient(500px 300px at 90% 10%, rgba(0,201,167,.22), transparent 60%);
-      }
-      .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; position: relative; z-index: 1; }
-
-      /* Nav */
-      nav {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 18px 0; gap: 12px; flex-wrap: wrap;
-      }
-      .nav-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 700; font-size: 17px; }
-      .logo {
-            width: 38px; height: 38px; border-radius: 11px;
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            display: grid; place-items: center; font-size: 20px;
-            box-shadow: 0 6px 18px rgba(47,128,237,.4);
-      }
-      .nav-link {
-            color: rgba(255,255,255,.85); text-decoration: none; font-size: 13.5px;
-            border: 1px solid rgba(255,255,255,.25); padding: 8px 16px; border-radius: 999px;
-            transition: .15s; white-space: nowrap;
-      }
-      .nav-link:hover { background: rgba(255,255,255,.14); }
-
-      /* Hero */
-      .hero { text-align: center; padding: 48px 0 38px; color: #fff; }
-      .hero h1 {
-            font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: 1px;
-            background: linear-gradient(90deg, #fff, #bfe0ff);
-            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-      }
-      .hero p { margin-top: 14px; font-size: clamp(14px, 2.4vw, 17px); color: rgba(255,255,255,.78); max-width: 640px; margin-inline: auto; line-height: 1.8; }
-      .hero-tags { margin-top: 18px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-      .tag {
-            background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22);
-            padding: 7px 16px; border-radius: 999px; font-size: 13px; color: #fff;
-      }
-      .cta { margin-top: 26px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-      .btn {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 13px 28px; border-radius: 12px; font-size: 15px; font-weight: 700;
-            text-decoration: none; transition: .15s;
-      }
-      .btn-primary { background: linear-gradient(135deg, var(--accent), #1c5fd6); color: #fff; box-shadow: 0 8px 22px rgba(47,128,237,.45); }
-      .btn-primary:hover { transform: translateY(-2px); }
-      .btn-ghost { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.3); }
-      .btn-ghost:hover { background: rgba(255,255,255,.18); }
-
-      /* 预览 */
-      .preview {
-            background
-  </style></title>
-  </head>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1f3a">
+<title>CFBox 节点维护面板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{min-height:100vh;background:linear-gradient(160deg,#0b1f3a 0%,#12315f 55%,#0e4d5e 100%);color:#fff;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:24px}
+.wrap{max-width:960px;margin:0 auto}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:20px}
+.brand{font-weight:800;font-size:17px;letter-spacing:.5px}
+.brand b{color:#5eb1ff}
+.nav-link{color:rgba(255,255,255,.85);text-decoration:none;font-size:13.5px;border:1px solid rgba(255,255,255,.25);padding:8px 16px;border-radius:999px;transition:.15s}
+.nav-link:hover{background:rgba(255,255,255,.14)}
+.hero{text-align:center;padding:52px 0 40px}
+.hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:1px;background:linear-gradient(90deg,#fff,#bfe0ff);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{margin-top:14px;font-size:clamp(14px,2.4vw,17px);color:rgba(255,255,255,.78);max-width:640px;margin-inline:auto}
+.tags{margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tag{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);padding:7px 16px;border-radius:999px;font-size:13px}
+.cta{margin-top:26px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;border-radius:12px;font-size:15px;font-weight:700;text-decoration:none;transition:.15s}
+.btn-primary{background:linear-gradient(135deg,#2f80ed,#1c5fd6);color:#fff;box-shadow:0 8px 22px rgba(47,128,237,.35)}
+.btn-primary:hover{transform:translateY(-2px)}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.3)}
+.preview{margin:34px 0;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.4)}
+.preview img{display:block;width:100%}
+.feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:28px 0}
+.feat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:18px}
+.feat h3{font-size:15px;margin-bottom:6px}
+.feat p{font-size:13px;color:rgba(255,255,255,.72);line-height:1.6}
+footer{margin-top:30px;text-align:center;font-size:12.5px;color:rgba(255,255,255,.45)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="nav"><div class="brand">CFBox <b>节点维护面板</b></div><a class="nav-link" href="https://github.com/dongkunjian/cfbox-maintain" target="_blank">GitHub 源码</a></nav>
+<div class="hero">
+<h1>CFBox 节点维护面板</h1>
+<p>为 Cloudflare Workers VLESS 订阅打造的自动优选与维护工具：自动优选、真实测速、保底保护、一键写入部署配置。</p>
+<div class="tags"><span class="tag">自动优选</span><span class="tag">真实测速</span><span class="tag">保底保护</span><span class="tag">本地运行</span></div>
+<div class="cta"><a class="btn btn-primary" href="https://github.com/dongkunjian/cfbox-maintain" target="_blank">查看源码</a><a class="btn btn-ghost" href="#preview">界面预览</a></div>
+</div>
+<div class="preview" id="preview"><img src="https://raw.githubusercontent.com/dongkunjian/cfbox-maintain/main/preview.png" alt="界面预览"></div>
+<div class="feats">
+<div class="feat"><h3>⚡ 自动优选</h3><p>从多个优选源拉取候选节点，并发 TCP 延迟筛选。</p></div>
+<div class="feat"><h3>🚀 真实测速</h3><p>通过 xray 真实 VLESS+WS 隧道测速，不靠猜测。</p></div>
+<div class="feat"><h3>🛡️ 保底保护</h3><p>内置保底节点，跑得动的节点永不丢失。</p></div>
+<div class="feat"><h3>🔒 本地运行</h3><p>数据只在你的电脑上处理，安全可控。</p></div>
+</div>
+<footer>本地工具 · 数据只在你的电脑上处理 · GitHub 开源</footer>
+</div>
+</body>
+</html>
