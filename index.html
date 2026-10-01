@@ -201,6 +201,32 @@
     line-height: 1.75;
     margin: 16px 0;
   }
+  /* GitHub 设置 */
+  .gh-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1.2fr 1fr 0.6fr auto;
+    gap: 10px;
+    align-items: end;
+  }
+  .input-wide { width: 100%; }
+  .input-mid { width: 100%; }
+  .gh-token { grid-column: 1; }
+  .sub-status {
+    background: #f0f7ff;
+    border: 1px solid #cfe3fb;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: #3a5577;
+    margin-bottom: 12px;
+  }
+  .mono-link {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    word-break: break-all;
+  }
   .actions { display: flex; gap: 12px; flex-wrap: wrap; }
   .msg { margin-top: 12px; font-size: 13.5px; font-weight: 700; }
   .msg.ok { color: var(--ok); }
@@ -288,6 +314,10 @@
     .result-meta { font-size: 11.5px; padding: 8px 11px; }
     .deploy-box { font-size: 12.5px; padding: 11px 13px; }
     textarea { height: 110px; }
+    /* GitHub 设置手机端竖排 */
+    .gh-grid { grid-template-columns: 1fr; gap: 8px; }
+    .gh-token { grid-column: 1; }
+    .gh-grid .btn { width: 100%; margin-left: 0 !important; }
   }
   /* 极小屏 */
   @media (max-width: 380px) {
@@ -309,6 +339,40 @@
     </div>
     <span class="pill" id="statusPill"><span class="dot" id="statusDot"></span><span id="statusText">空闲</span></span>
   </header>
+
+  <!-- GitHub 设置 -->
+  <section class="card" style="animation-delay:.01s">
+    <div class="card-head">
+      <span class="step-badge">⚙</span>
+      <h2>GitHub 订阅设置</h2>
+      <span class="tip" id="ghTip">用于「一键上传 GitHub」</span>
+    </div>
+    <div class="gh-grid">
+      <div class="field gh-token">
+        <label for="ghToken">Token（PAT，需 repo 权限）</label>
+        <input class="input input-wide" id="ghToken" type="password" placeholder="ghp_... 或 github_pat_...">
+      </div>
+      <div class="field">
+        <label for="ghRepo">仓库</label>
+        <input class="input input-mid" id="ghRepo" type="text" value="dongkunjian/cfbox-maintain">
+      </div>
+      <div class="field">
+        <label for="ghFile">订阅文件</label>
+        <input class="input input-mid" id="ghFile" type="text" value="nodes_sub.txt">
+      </div>
+      <div class="field">
+        <label for="ghBranch">分支</label>
+        <input class="input" id="ghBranch" type="text" value="main">
+      </div>
+      <button class="btn btn-ghost" id="btnSaveGh" style="margin-left:auto">保存设置</button>
+    </div>
+    <div class="hint">
+      获取 Token：GitHub → 头像 → <b>Settings</b> → <b>Developer settings</b> → <b>Personal access tokens</b> →
+      <b>Tokens (classic)</b> → <b>Generate new token</b>，勾选 <b>repo</b>，生成后粘贴到这里保存（仅存本机 <code>gh_settings.json</code>）。
+      <br>上传后订阅地址为 <code id="rawUrlShow" style="color:var(--accent)">https://raw.githubusercontent.com/仓库/分支/文件</code>，
+      cfbb 管理页「自定义优选」填这个地址（汇聚订阅），以后每次优选后点「一键上传 GitHub」即可，Karing 更新订阅自动生效。
+    </div>
+  </section>
 
   <!-- Step 1 -->
   <section class="card" style="animation-delay:.03s">
@@ -356,16 +420,24 @@
       </table>
     </div>
     <div class="deploy-box">
-      ① 点「更新部署」自动写入 <b>qinyu</b>（CFBox订阅）　② 点「自动上传」并在对话发送 <b>上传cfbb</b>，我自动填表保存到 cfbb 管理页
-      　③ 到 Karing 更新「自己用」「CFBox订阅」生效。
+      ① 点「更新部署」自动写入 <b>qinyu</b>（CFBox订阅），并生成订阅文件（<b>nodes_sub.txt</b>）
+      ② 点「一键上传 GitHub」把新节点推送到 <b>GitHub 订阅</b>，cfbb「自定义优选」已填该订阅地址（汇聚订阅）即自动生效
+      ③ 到 Karing 更新「自己用」订阅，完成。
+    </div>
+    <div class="sub-status hidden" id="subStatus">
+      <div>📄 订阅文件：<span id="subPath"></span>（<span id="subSize"></span>B，生成于 <span id="subTime"></span>）</div>
+      <div>🔗 GitHub 订阅：<span class="mono-link" id="subRaw"></span></div>
+      <div>📡 cfbb 订阅：<span class="mono-link" id="subCfbb"></span></div>
     </div>
     <div class="actions">
       <button class="btn btn-ok" id="btnApply">✓ 更新部署</button>
-      <button class="btn btn-primary" id="btnUpload">⚡ 自动上传到 cfbb</button>
+      <button class="btn btn-primary" id="btnGh">⬆ 一键上传 GitHub</button>
+      <button class="btn btn-ghost" id="btnUpload">⚡ 自动上传到 cfbb（手动）</button>
       <button class="btn btn-ghost" id="btnCopy">📋 复制内容（兜底）</button>
     </div>
     <div class="msg hidden" id="applyMsg"></div>
     <div class="msg hidden" id="uploadMsg"></div>
+    <div class="msg hidden" id="ghMsg"></div>
     <textarea id="cfbbBox" readonly placeholder="复制内容：这里显示要粘贴到 cfbb 管理页「自定义优选」的节点..."></textarea>
   </section>
 
@@ -378,8 +450,38 @@
 <script>
 const $ = id => document.getElementById(id);
 const btnStart = $('btnStart'), btnApply = $('btnApply'), btnCopy = $('btnCopy'), btnUpload = $('btnUpload');
+const btnGh = $('btnGh'), btnSaveGh = $('btnSaveGh');
 const LABELS = { ip: '节点', src: '来源', ms: '延迟', speed: '速度' };
 let lastLogCount = -1;
+
+// ---- GitHub 设置加载/保存 ----
+async function loadSettings() {
+  try {
+    const d = await (await fetch('/api/settings')).json();
+    $('ghRepo').value = d.gh_repo || '';
+    $('ghFile').value = d.gh_file || '';
+    $('ghBranch').value = d.gh_branch || '';
+    if (d.gh_token) $('ghToken').value = d.gh_token;
+    const raw = 'https://raw.githubusercontent.com/' + (d.gh_repo || '') + '/' + (d.gh_branch || '') + '/' + (d.gh_file || '');
+    $('rawUrlShow').textContent = raw;
+    if (!d.gh_token || d.gh_token.endsWith('****')) $('ghTip').textContent = '尚未配置 Token（可选，仅一键上传需要）';
+    else $('ghTip').textContent = '✓ Token 已配置';
+  } catch (e) { /* 服务未连接时忽略 */ }
+}
+
+btnSaveGh.onclick = async () => {
+  const body = {
+    gh_token: $('ghToken').value.trim(),
+    gh_repo: $('ghRepo').value.trim(),
+    gh_file: $('ghFile').value.trim(),
+    gh_branch: $('ghBranch').value.trim(),
+  };
+  const d = await (await fetch('/api/settings', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  })).json();
+  if (d.ok) { alert('设置已保存'); loadSettings(); }
+  else alert('保存失败');
+};
 
 function setStatus(running, text, cls) {
   const dot = $('statusDot');
@@ -435,6 +537,18 @@ function renderResult(r) {
   $('resultCard').classList.remove('hidden');
 }
 
+function renderSubStatus(d) {
+  if (!d.sub_info || !d.sub_info.exists) { $('subStatus').classList.add('hidden'); return; }
+  $('subStatus').classList.remove('hidden');
+  $('subPath').textContent = d.sub_info.path;
+  $('subSize').textContent = d.sub_info.bytes;
+  $('subTime').textContent = d.sub_info.mtime;
+  $('subRaw').textContent = d.sub_info.raw_url;
+  $('subRaw').title = d.sub_info.raw_url;
+  $('subCfbb').textContent = d.sub_info.cfbb_sub;
+  $('subCfbb').title = d.sub_info.cfbb_sub;
+}
+
 async function poll() {
   try {
     const d = await (await fetch('/api/status')).json();
@@ -450,6 +564,7 @@ async function poll() {
     } else {
       btnStart.disabled = false;
       btnApply.disabled = false;
+      renderSubStatus(d);
       if (d.result) {
         setStatus(false, '优选完成', 'done');
         if (logChanged || !$('resultCard').classList.contains('hidden')) renderResult(d.result);
@@ -514,6 +629,28 @@ btnUpload.onclick = async () => {
   }
 };
 
+btnGh.onclick = async () => {
+  btnGh.disabled = true;
+  btnGh.textContent = '上传中...';
+  const msg = $('ghMsg');
+  msg.classList.remove('hidden');
+  try {
+    const d = await (await fetch('/api/upload-gh', {method: 'POST'})).json();
+    if (d.ok) {
+      msg.className = 'msg ok';
+      msg.textContent = '✓ 已上传：' + d.raw + '　→ Karing 更新「自己用」订阅即可（cfbb 汇聚订阅自动拉取）。';
+    } else {
+      msg.className = 'msg err';
+      msg.textContent = '上传失败：' + (d.error || '未知错误') + '（若未填 Token，先到上方 GitHub 设置保存）';
+    }
+  } catch (e) {
+    msg.className = 'msg err';
+    msg.textContent = '请求失败：' + e.message;
+  }
+  btnGh.disabled = false;
+  btnGh.textContent = '⬆ 一键上传 GitHub';
+};
+
 btnCopy.onclick = async () => {
   const d = await (await fetch('/api/cfbb')).json();
   const content = d.content || '';
@@ -530,6 +667,7 @@ btnCopy.onclick = async () => {
 
 setInterval(poll, 1000);
 poll();
+loadSettings();
 </script>
 </body>
 </html>

@@ -7,8 +7,9 @@ CFBox 维护网页版 - 本地服务
 流程（网页上点按钮）：
   1. 「开始优选」  -> 后台跑 拉源/筛选/测速/保底（预演，不改线上）
   2. 查看结果表格 -> 满意后
-  3. 「更新部署」  -> 自动写 qinyu 配置 + 生成 cfbb 粘贴内容
-  4. 「复制粘贴内容」-> 到 cfbb 管理页粘贴保存（cfbb API 不可靠，半手动）
+  3. 「更新部署」  -> 自动写 qinyu 配置 + 生成订阅文件（nodes_sub.txt）+ cfbb 粘贴内容
+  4. 「一键上传 GitHub」-> 把订阅文件上传到 GitHub，cfbb 汇聚订阅自动生效
+  5. Karing 更新「自己用」订阅 -> 连接新节点
 
 地址: http://127.0.0.1:8899   （仅本机访问，端口可改 PORT）
 """
@@ -26,6 +27,33 @@ sys.path.insert(0, BASE)
 import cfbox_maintain as cm
 
 PORT = 8899
+SETTINGS_FILE = os.path.join(BASE, "gh_settings.json")
+
+DEFAULT_SETTINGS = {
+    "gh_token": "",                 # GitHub Personal Access Token（repo 权限）
+    "gh_repo": cm.GH["repo"],       # 仓库 owner/name
+    "gh_file": cm.GH["file"],       # 订阅文件名
+    "gh_branch": cm.GH["branch"],   # 分支
+}
+
+
+def load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with io.open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            for k, v in DEFAULT_SETTINGS.items():
+                d.setdefault(k, v)
+            return d
+        except Exception:
+            pass
+    return dict(DEFAULT_SETTINGS)
+
+
+def save_settings(d):
+    with io.open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+
 
 # ==================== 任务状态 ====================
 
@@ -75,7 +103,7 @@ def start_optimize(min_kbps):
 
 
 def apply_deploy():
-    """用最近一次优选结果更新部署（qinyu 自动 + cfbb 生成粘贴文件）"""
+    """用最近一次优选结果更新部署（qinyu 自动 + 生成订阅文件 + cfbb 粘贴）"""
     with _lock:
         if STATE["running"]:
             return {"ok": False, "error": "任务仍在运行，请稍候"}
@@ -91,8 +119,10 @@ def apply_deploy():
         if ok_q:
             time.sleep(2)
             cm.verify_qinyu_sub(nodes)
+        # 生成订阅文件（明文+base64，供 GitHub 一键上传 / cfbb 汇聚订阅）
+        cm.gen_gh_sub(nodes)
         cm.gen_cfbb_paste(nodes)
-        _append_log("完成！到 Karing 里更新「自己用」订阅即可生效。")
+        _append_log("完成！接下来：Karing 更新「自己用」订阅即可生效；或点「一键上传 GitHub」走汇聚订阅闭环。")
         return {"ok": True, "qinyu_ok": ok_q}
     except Exception as e:
         _append_log(f"✗ 更新失败: {repr(e)}")
@@ -101,13 +131,60 @@ def apply_deploy():
         cm.LOG_HOOK = None
 
 
+def upload_gh():
+    """一键：用最近一次优选结果生成订阅并上传 GitHub"""
+    with _lock:
+        if STATE["running"]:
+            return {"ok": False, "error": "任务仍在运行，请稍候"}
+        report = STATE["result"]
+    st = load_settings()
+    token = st.get("gh_token") or ""
+    if not token:
+        return {"ok": False, "error": "请先在「GitHub 设置」里填写 Personal Access Token"}
+    if not report or not report.get("top_nodes"):
+        return {"ok": False, "error": "还没有优选结果，请先点「开始优选」"}
+
+    cm.LOG_HOOK = _append_log
+    try:
+        nodes = [(ip, port, ms, kbps) for ip, port, ms, kbps, _src in report["top_nodes"]]
+        plain = cm.gen_gh_sub(nodes)
+        _append_log(f"上传 {st['gh_repo']}/{st['gh_file']} ...")
+        sha = cm.gh_upload_file(token, st["gh_repo"], st["gh_file"], plain,
+                                branch=st["gh_branch"],
+                                message="Update CFBox subscription (auto from panel)")
+        raw = "https://raw.githubusercontent.com/%s/%s/%s" % (st["gh_repo"], st["gh_branch"], st["gh_file"])
+        _append_log(f"✓ GitHub 上传成功: {raw}")
+        _append_log(f"  commit: {sha}")
+        _append_log(f"  cfbb 汇聚订阅已指向该地址，Karing 更新「自己用」即生效")
+        return {"ok": True, "raw": raw, "sha": sha}
+    except Exception as e:
+        _append_log(f"✗ GitHub 上传失败: {repr(e)}")
+        return {"ok": False, "error": repr(e)}
+    finally:
+        cm.LOG_HOOK = None
+
+
 def get_status():
     with _lock:
+        r = STATE["result"]
+        sub_info = None
+        if r and r.get("top_nodes"):
+            p = os.path.join(BASE, "nodes_sub.txt")
+            if os.path.exists(p):
+                sub_info = {
+                    "exists": True,
+                    "bytes": os.path.getsize(p),
+                    "mtime": time.strftime("%H:%M:%S", time.localtime(os.path.getmtime(p))),
+                    "path": p,
+                    "raw_url": cm.GH["raw_url"],
+                    "cfbb_sub": cm.CFBB["sub_url"],
+                }
         return {
             "running": STATE["running"],
             "logs": list(STATE["logs"]),
             "result": STATE["result"],
             "last_error": STATE["last_error"],
+            "sub_info": sub_info,
         }
 
 
@@ -134,12 +211,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, html, "text/html; charset=utf-8")
         elif path == "/api/status":
             self._send(200, json.dumps(get_status(), ensure_ascii=False))
+        elif path == "/api/settings":
+            st = load_settings()
+            st = dict(st)
+            if st.get("gh_token"):
+                st["gh_token"] = st["gh_token"][:4] + "****" + st["gh_token"][-4:]
+            self._send(200, json.dumps(st, ensure_ascii=False))
         elif path == "/api/cfbb":
             p = os.path.join(BASE, "cfbb_nodes_to_paste.txt")
             content = io.open(p, "r", encoding="utf-8").read() if os.path.exists(p) else ""
             self._send(200, json.dumps({"content": content, "exists": bool(content.strip())}, ensure_ascii=False))
         elif path == "/api/upload-check":
-            # 检查是否有待上传的 cfbb 内容（供对话侧自动上传）
             p = os.path.join(BASE, "cfbb_nodes_to_paste.txt")
             ready = os.path.exists(p) and os.path.getsize(p) > 10
             self._send(200, json.dumps({"ready": ready, "file": p if ready else None}, ensure_ascii=False))
@@ -161,6 +243,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, json.dumps({"ok": ok}))
         elif path == "/api/apply":
             self._send(200, json.dumps(apply_deploy(), ensure_ascii=False))
+        elif path == "/api/upload-gh":
+            self._send(200, json.dumps(upload_gh(), ensure_ascii=False))
+        elif path == "/api/settings":
+            st = load_settings()
+            if "gh_token" in data:
+                st["gh_token"] = str(data["gh_token"]).strip()
+            if "gh_repo" in data:
+                st["gh_repo"] = str(data["gh_repo"]).strip() or cm.GH["repo"]
+            if "gh_file" in data:
+                st["gh_file"] = str(data["gh_file"]).strip() or cm.GH["file"]
+            if "gh_branch" in data:
+                st["gh_branch"] = str(data["gh_branch"]).strip() or cm.GH["branch"]
+            save_settings(st)
+            self._send(200, json.dumps({"ok": True}))
         else:
             self._send(404, json.dumps({"error": "not found"}))
 
